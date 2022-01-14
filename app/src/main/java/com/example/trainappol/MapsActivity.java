@@ -122,6 +122,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         //버튼을 뷰와 연결
         Check_Start = findViewById(R.id.btn1);
         Check_Termin = findViewById(R.id.btn2);
+        Check_Termin.setEnabled(false);
+
 
         handler = new Handler() ;
 
@@ -220,6 +222,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             Time.setText("측정시간: " + String.format("%02d",Hour) + ":" + String.format("%02d",Minutes) + ":" + String.format("%02d", Seconds));
 
             handler.postDelayed(this, 0);
+
         }
     };
 
@@ -242,6 +245,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         @Override
         public void onProviderDisabled(String provider) {
             // TODO Auto-generated method stub
+            // low_indetion of priod.
 
         }
 
@@ -338,6 +342,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         @Override
         public void onLocationResult(LocationResult locationResult) {
             super.onLocationResult(locationResult);
+            //map collection priod
             TextView LatLong = findViewById(R.id.latlong);
             int i;
 

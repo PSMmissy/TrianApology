@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">TrainAppol</string>
-    <string name="title_activity_maps">MapsActivity</string>
+    <string name="app_name">GPS성능 측정기</string>
+    <string name="title_activity_maps">GPS성능 측정기</string>
 </resources>

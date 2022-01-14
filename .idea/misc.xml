@@ -3,6 +3,7 @@
   <component name="DesignSurface">
     <option name="filePathToZoomLevelMap">
       <map>
+        <entry key="..\:/trainapl/app/src/main/res/drawable-v24/ic_launcher_foreground.xml" value="0.21458333333333332" />
         <entry key="..\:/trainapl/app/src/main/res/layout/activity_maps.xml" value="0.25" />
       </map>
     </option>
