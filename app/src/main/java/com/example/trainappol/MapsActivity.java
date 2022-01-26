@@ -577,7 +577,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
 
             // 모든 퍼미션을 허용했는지 체크합니다.
-
+    
             for (int result : grandResults) {
                 if (result != PackageManager.PERMISSION_GRANTED) {
                     check_result = false;
