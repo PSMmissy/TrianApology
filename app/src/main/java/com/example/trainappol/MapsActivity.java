@@ -1,13 +1,5 @@
 package com.example.trainappol;
 
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.widget.AppCompatButton;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
-import androidx.fragment.app.FragmentActivity;
-import androidx.room.Room;
-
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -22,14 +14,20 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.Message;
 import android.os.SystemClock;
 import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.Chronometer;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.AppCompatButton;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.FragmentActivity;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
@@ -46,11 +44,18 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.material.snackbar.Snackbar;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         , ActivityCompat.OnRequestPermissionsResultCallback {
@@ -62,6 +67,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     //타이머 변수
     private TextView Time;
+    private EditText et_TrainNo;
+    private EditText et_StartLoc;
 
     private long MillisecondTime = 0L;  // 측정 시작 버튼을 누르고 흐른 시간
     private long StartTime = 0L;        // 측정 시작 버튼 누르고 난 이후 부터의 시간
@@ -103,7 +110,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private LocationRequest locationRequest;
     private Location location;
 
-
+    private DatabaseReference mDatabase;
     private View mLayout;  // Snackbar 사용하기 위해서는 View가 필요합니다.
     // (참고로 Toast에서는 Context가 필요했습니다.)
 
@@ -112,6 +119,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
         Time = findViewById(R.id.Time);
+        et_TrainNo = findViewById(R.id.edit1);
+        et_StartLoc = findViewById(R.id.edit2);
 
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -124,6 +133,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         Check_Termin = findViewById(R.id.btn2);
         Check_Termin.setEnabled(false);
 
+        mDatabase = FirebaseDatabase.getInstance().getReference();
 
         handler = new Handler() ;
 
@@ -135,13 +145,40 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 handler.postDelayed(runnable, 0);
                 Check_Start.setEnabled(false);
                 Check_Termin.setEnabled(true);
+                Timer timer = new Timer();
+                et_TrainNo.setEnabled(false);
+                TimerTask timerTask = new TimerTask() {
+                    @Override
+                    public void run() {
+                        int getTrainNo = Integer.parseInt(et_TrainNo.getText().toString());
+                        String getStartLoc = et_StartLoc.getText().toString();
+                        Double getLat = location.getLatitude();
+                        Double getLong = location.getLongitude();
+                        Double getSpeed = 3.6 * location.getSpeed();
+                        String getMvtm = Time.getText().toString();
+                        Double getMvst = getSpeed * 10 / 36;
 
+                        HashMap result = new HashMap<>();
+                        result.put("TrainNo", getTrainNo);
+                        result.put("StartLoc", getStartLoc);
+                        result.put("Lat", getLat);
+                        result.put("Long", getLong);
+                        result.put("Speed", getSpeed);
+                        result.put("Mvtm", getMvtm);
+                        result.put("Mvts", getMvst);
+
+                        writeNewUser("1",getTrainNo,getStartLoc,getLat,getLong,getSpeed,getMvtm,getMvst);
+                    }
+                };
+                timer.schedule(timerTask,0, 1000);
 
             }
         });
         Check_Termin.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                mDatabase = FirebaseDatabase.getInstance().getReference("disconnectmessage");
+                mDatabase.onDisconnect().setValue("I discconnected!");
                 isRunning = !isRunning;
                 if(isRunning){
                     Check_Termin.setText("측정종료");
@@ -204,6 +241,27 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
         lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, ll);
     }
+
+    private void writeNewUser (String userId, int TrainNo, String StartLoc,
+                                Double Lat, Double Long, Double Speed, String Mvtm, Double Mvst){
+        User user = new User(TrainNo,StartLoc, Lat, Long, Speed, Mvtm, Mvst);
+        mDatabase.child("users").child(userId).setValue(user)
+                .addOnSuccessListener(new OnSuccessListener<Void>() {
+                    @Override
+                    public void onSuccess(Void unused) {
+                        // 쓰기 성공 시
+                        Toast.makeText(MapsActivity.this,"저장을 완료했습니다.", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        // 데이터 쓰기 실패 시
+                        Toast.makeText(MapsActivity.this, "저장에 실패했습니다.", Toast.LENGTH_SHORT).show();
+                    }
+                });
+    }
+
     public Runnable runnable = new Runnable() {
         public void run() {
             MillisecondTime = SystemClock.uptimeMillis() - StartTime;
@@ -235,7 +293,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             if (location != null){
                 mySpeed = 3.6 * location.getSpeed();
                 Double Distance = mySpeed * 10 / 36 ;
-                //속도는 여기입니다 형님.
+                //속도는 여기입니다
                 V.setText("현재속도:\n" +String.format("%.2f", mySpeed) + " km/h");
                 D.setText("1초동안 이동한 거리: \n" + String.format( "%.2f",Distance) +" m");
 
@@ -577,7 +635,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
 
             // 모든 퍼미션을 허용했는지 체크합니다.
-    
+
             for (int result : grandResults) {
                 if (result != PackageManager.PERMISSION_GRANTED) {
                     check_result = false;

@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "75240989944",
+    "project_id": "caramel-theory-337102",
+    "storage_bucket": "caramel-theory-337102.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:75240989944:android:7e93ad92e59dc8a75dc70d",
+        "android_client_info": {
+          "package_name": "com.example.trainappol"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "75240989944-qr2hnf7luvf8l1rg33d5rjjdrh0mgn23.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBrxzGclh_aHhrx94hjCFSJ0YG74Th0KnY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "75240989944-qr2hnf7luvf8l1rg33d5rjjdrh0mgn23.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
