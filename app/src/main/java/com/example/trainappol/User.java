@@ -5,93 +5,89 @@ import com.google.firebase.database.IgnoreExtraProperties;
 @IgnoreExtraProperties
 public class User {
 
-    public int TrainNo;
-    public String StartLoc;
-    public Double Lat;
-    public Double Long;
-    public Double Speed;
-    public String Mvtm;
-    public Double Mvst;
+    public String trainNo;
+    public String startLoc;
+    public Double lat;
+    public Double longt;
+    public Double speed;
+    public String mvtm;
+    public Double mvst;
 
     public User(){
 
     }
 
-    public User(int TrainNo, String StartLoc, Double Lat, Double Long, Double Speed, String Mvtm, Double Mvst){
-        this.TrainNo = TrainNo;
-        this.StartLoc = StartLoc;
-        this.Lat = Lat;
-        this.Long = Long;
-        this.Speed = Speed;
-        this.Mvtm = Mvtm;
-        this.Mvst = Mvst;
+    public User(String trainNo, String startLoc, Double lat, Double longt, Double speed, String mvtm, Double mvst){
+        this.trainNo = trainNo;
+        this.startLoc = startLoc;
+        this.lat = lat;
+        this.longt = longt;
+        this.speed = speed;
+        this.mvtm = mvtm;
+        this.mvst = mvst;
     }
-    public int getTrainNo(){
-        return TrainNo;
+    public String getTrainNo(){
+        return trainNo;
     }
 
-    public void setTrainNo(int TrainNo){
-        this.TrainNo = TrainNo;
+    public void setTrainNo(String trainNo){
+        this.trainNo = trainNo;
     }
 
     public String getStartLoc(){
-        return StartLoc;
+        return startLoc;
     }
 
-    public void setStartLoc(String StartLoc){
-        this.StartLoc = StartLoc;
+    public void setStartLoc(String startLoc){
+        this.startLoc = startLoc;
     }
 
     public Double getLat(){
-        return Lat;
+        return lat;
     }
 
-    public void setLat(Double Lat){
-        this.Lat = Lat;
+    public void setLat(Double lat){
+        this.lat = lat;
     }
 
-    public Double getLong(){
-        return Long;
-    }
+    public Double getLongt(){ return longt; }
 
-    public void setLong(Double Long){
-        this.Long = Long;
-    }
+    public void setLong(Double longt){ this.longt = longt; }
 
     public Double getSpeed(){
-        return Speed;
+        return speed;
     }
 
-    public void setSpeed(Double Speed){
-        this.Speed = Speed;
+    public void setSpeed(Double speed){
+        this.speed = speed;
     }
 
     public String getMvtm(){
-        return Mvtm;
+        return mvtm;
     }
 
-    public void setMvtm(String Mvtm){
-        this.Mvtm = Mvtm;
+    public void setMvtm(String mvtm){
+        this.mvtm = mvtm;
     }
 
     public Double getMvst(){
-        return Mvst;
+        return mvst;
     }
 
-    public void setMvst(Double Mvst){
-        this.Mvst = Mvst;
+    public void setMvst(Double mvst){
+        this.mvst = mvst;
     }
 
     @Override
     public String toString(){
         return "User{" +
-                "TrainNo ='" + TrainNo + '\'' +
-                ", StartLoc ='" + StartLoc + '\'' +
-                ", Lat ='" + Lat + '\'' +
-                ", Long ='" + Long + '\'' +
-                ", Speed ='" + Speed + '\'' +
-                ", Mvtm ='" + Mvtm + '\'' +
-                ", Mvts ='" + Mvst + '\'' +
+                "trainNo ='" + trainNo + '\'' +
+                ", startLoc ='" + startLoc + '\'' +
+                ", lat ='" + lat + '\'' +
+                ", longt ='" + longt + '\'' +
+                ", speed ='" + speed + '\'' +
+                ", mvtm ='" + mvtm + '\'' +
+                ", mvts ='" + mvst + '\'' +
                 '}';
     }
 }
