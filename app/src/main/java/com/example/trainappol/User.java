@@ -6,25 +6,27 @@ import com.google.firebase.database.IgnoreExtraProperties;
 public class User {
 
     public String trainNo;
-    public String startLoc;
-    public Double lat;
-    public Double longt;
-    public Double speed;
-    public String mvtm;
-    public Double mvst;
+    public String startLocation;
+    public double latitude;
+    public double longitude;
+    public double speed;
+    public String times;
+    public double distance_per_sec;
+    public String datetime;
 
     public User(){
 
     }
 
-    public User(String trainNo, String startLoc, Double lat, Double longt, Double speed, String mvtm, Double mvst){
+    public User(String trainNo, String startLocation, double latitude, double longitude, double speed, String times, double distance_per_sec, String datetime){
         this.trainNo = trainNo;
-        this.startLoc = startLoc;
-        this.lat = lat;
-        this.longt = longt;
+        this.startLocation = startLocation;
+        this.latitude = latitude;
+        this.longitude = longitude;
         this.speed = speed;
-        this.mvtm = mvtm;
-        this.mvst = mvst;
+        this.times = times;
+        this.distance_per_sec = distance_per_sec;
+        this.datetime = datetime;
     }
     public String getTrainNo(){
         return trainNo;
@@ -34,60 +36,66 @@ public class User {
         this.trainNo = trainNo;
     }
 
-    public String getStartLoc(){
-        return startLoc;
+    public String getStartLocation(){
+        return startLocation;
     }
 
-    public void setStartLoc(String startLoc){
-        this.startLoc = startLoc;
+    public void setStartLocation(String startLocation){
+        this.startLocation = startLocation;
     }
 
-    public Double getLat(){
-        return lat;
+    public double getLatitude(){
+        return latitude;
     }
 
-    public void setLat(Double lat){
-        this.lat = lat;
-    }
+    public void setLatitude(double latitude){ this.latitude = latitude; }
 
-    public Double getLongt(){ return longt; }
+    public double getLongitude(){ return longitude; }
 
-    public void setLong(Double longt){ this.longt = longt; }
+    public void setLongitude(double longitude){ this.longitude = longitude; }
 
-    public Double getSpeed(){
+    public double getSpeed(){
         return speed;
     }
 
-    public void setSpeed(Double speed){
+    public void setSpeed(double speed){
         this.speed = speed;
     }
 
-    public String getMvtm(){
-        return mvtm;
+    public String getTimes(){
+        return times;
     }
 
-    public void setMvtm(String mvtm){
-        this.mvtm = mvtm;
+    public void setO6_times(String times){
+        this.times = times;
     }
 
-    public Double getMvst(){
-        return mvst;
+    public double getDistance_per_sec(){
+        return distance_per_sec;
     }
 
-    public void setMvst(Double mvst){
-        this.mvst = mvst;
+    public void setDistance_per_sec(double distance_per_sec){
+        this.distance_per_sec = distance_per_sec;
+    }
+    public String getDatetime(){
+        return datetime;
+    }
+
+    public void setDatetime(String datetime){
+        this.datetime = datetime;
     }
 
     @Override
     public String toString(){
         return "User{" +
                 "trainNo ='" + trainNo + '\'' +
-                ", startLoc ='" + startLoc + '\'' +
-                ", lat ='" + lat + '\'' +
-                ", longt ='" + longt + '\'' +
+                ", startLocation ='" + startLocation + '\'' +
+                ", latitude ='" + latitude + '\'' +
+                ", longitude ='" + longitude + '\'' +
                 ", speed ='" + speed + '\'' +
-                ", mvtm ='" + mvtm + '\'' +
-                ", mvts ='" + mvst + '\'' +
+                ", times ='" + times + '\'' +
+                ", distance_per_sec ='" + distance_per_sec + '\'' +
+                ", datetime ='" + datetime + '\'' +
                 '}';
     }
 }

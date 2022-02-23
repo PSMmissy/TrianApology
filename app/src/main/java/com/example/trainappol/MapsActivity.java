@@ -53,11 +53,13 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.Date;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         , ActivityCompat.OnRequestPermissionsResultCallback {
@@ -76,11 +78,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private long StartTime = 0L;        // 측정 시작 버튼 누르고 난 이후 부터의 시간
     long TimeBuff = 0L;         // 측정 종료 버튼 눌렀을 때의 총 시간
     long UpdateTime = 0L;       // 측정 종료 버튼 눌렀을 때의 총 시간 + 시작 버튼 누르고 난 이후 부터의 시간 = 총 시간
-    private int i = 1;
+    private int i;              // 데이터 Sequence
+    private double latitude;
+    private double longitude;
+    private double s, s1;
     private boolean isRunning = true; // 타이머 작동중
 
     private Handler handler;
-    private int Seconds, Minutes, Hour;
+    private int Sec, Seconds, Minutes, Hour;
 
     //구글맵 컨트롤러 변수들
     private GoogleMap mMap;
@@ -112,8 +117,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private FusedLocationProviderClient mFusedLocationClient;
     private LocationRequest locationRequest;
     private Location location;
-
+    private final Timer mTimer = new Timer();
+    private TimerTask mTimerTask;
     private DatabaseReference mDatabase;
+    //Date Types of in
+    private long mNow;
+    private Date mDate;
+    private SimpleDateFormat mFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
 
     private View mLayout;  // Snackbar 사용하기 위해서는 View가 필요합니다.
     // (참고로 Toast에서는 Context가 필요했습니다.)
@@ -123,6 +133,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
         Time = findViewById(R.id.Time);
+        Time.setText("경과시간:00:00:00");
         et_TrainNo = findViewById(R.id.edit2);
         et_StartLoc = findViewById(R.id.edit1);
 
@@ -141,61 +152,61 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         handler = new Handler() ;
 
         Check_Start.setOnClickListener(new View.OnClickListener() {
+
             @Override
             public void onClick(View view) {
-                // SystemClock.uptimeMillis()는 디바이스를 부팅한후 부터 쉰 시간을 제외한 밀리초를 반환
-                StartTime = SystemClock.uptimeMillis();
-                handler.postDelayed(runnable, 0);
-                Check_Start.setEnabled(false);
-                Check_Termin.setEnabled(true);
-                Timer timer = new Timer();
-                et_TrainNo.setEnabled(false);
-                et_StartLoc.setEnabled(false);
-                mDatabase = FirebaseDatabase.getInstance("https://zippy-elf-341602-default-rtdb.firebaseio.com/").getReference();
-                readUser();
-                TimerTask timerTask = new TimerTask() {
-                    @Override
-                    public void run() {
-                            String getTrainNo = et_TrainNo.getText().toString();
-                            String getStartLoc = et_StartLoc.getText().toString();
-                            Double getLat = location.getLatitude();
-                            Double getLongt = location.getLongitude();
-                            Double getSpeed = 3.6 * location.getSpeed();
-                            String getMvtm = Time.getText().toString();
-                            Double getMvst = getSpeed * 10 / 36;
-                            HashMap<String, Object> result = new HashMap<>();
-                            result.put("trainNo", getTrainNo);
-                            result.put("startLoc", getStartLoc);
-                            result.put("lat", getLat);
-                            result.put("longt", getLongt);
-                            result.put("speed", getSpeed);
-                            result.put("측정시간", getMvtm);
-                            result.put("mvts", getMvst);
-                            writeNewUser(Integer.toString(i), getTrainNo, getStartLoc, getLat, getLongt, getSpeed, getMvtm, getMvst);
-                            i++;
+                String Startlocation = et_StartLoc.getText().toString();
+                String TrainNumber = et_TrainNo.getText().toString();
+                if (Startlocation.getBytes().length <= 0 || TrainNumber.getBytes().length <= 0) {
+                    AlertDialog.Builder builder = new AlertDialog.Builder(MapsActivity.this);
+                    builder.setTitle("알림").setMessage("출발역 및 열차번호를 입력하세요.");
+                    builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            Toast.makeText(getApplicationContext(),"Please, Set TrainNo and Station Name.",Toast.LENGTH_SHORT).show();
                         }
-                };
+                    });
+                    AlertDialog alertDialog = builder.create();
+                    alertDialog.show();
+                } else {
+                    // SystemClock.uptimeMillis()는 디바이스를 부팅한후 부터 쉰 시간을 제외한 밀리초를 반환
+                    StartTime = SystemClock.uptimeMillis();
+                    handler.postDelayed(runnable, 0);
+                    Check_Start.setEnabled(false);
+                    Check_Termin.setEnabled(true);
+                    Timer timer = new Timer();
+                    et_TrainNo.setEnabled(false);
+                    et_StartLoc.setEnabled(false);
+                    mDatabase = FirebaseDatabase.getInstance("https://zippy-elf-341602-default-rtdb.firebaseio.com/").getReference();
+                    readUser();
+                    i = 1; //데이터 seq 1번부터 시작
+                    latitude = Double.parseDouble(String.format("%.5f",location.getLatitude()));
+                    longitude = Double.parseDouble(String.format("%.5f",location.getLongitude()));
+                    mTimerTask = createTimertask();
+                    mTimer.schedule(mTimerTask, 0, 1000);
 
-                timer.schedule(timerTask, 0, 1000);
-
+                }
             }
-
         });
         Check_Termin.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                mDatabase = FirebaseDatabase.getInstance("https://zippy-elf-341602-default-rtdb.firebaseio.com/").getReference("disconnectmessage");
-                mDatabase.onDisconnect().setValue("I discconnected!");
                 isRunning = !isRunning;
+                Check_Start.setEnabled(true);
+                if(mTimerTask != null){
+                    mTimerTask.cancel();
+                }
                 if(isRunning){
                     Check_Termin.setText("측정종료");
-                    Time.setText(null);
-                    Check_Start.setEnabled(true);
+                    Time.setText("경과시간:00:00:00");
+                    et_TrainNo.setText(null);
+                    et_StartLoc.setText(null);
                     Check_Termin.setEnabled(false);
                     et_TrainNo.setEnabled(true);
                     et_StartLoc.setEnabled(true);
                     Hour = 0;
                     Minutes = 0;
+                    Sec = 0;
                     Seconds = 0;
                 }
                 else{
@@ -206,8 +217,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         Check_Termin.setText("초기화");
                     }
                 }
-                // 스탑워치 일시정지 버튼 눌렀을 때의 총 시간
-//                TimeBuff += MillisecondTime;
 
                 // Runnable 객체 제거
                 handler.removeCallbacks(runnable);
@@ -250,10 +259,53 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
         lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, ll);
     }
+    private TimerTask createTimertask(){
+        TimerTask timerTask = new TimerTask() {
+            @Override
+            public void run() {
+                mNow = System.currentTimeMillis();
+                mDate = new Date(mNow);
+                String getTrainNo = et_TrainNo.getText().toString();
+                String getStartLocation = et_StartLoc.getText().toString();
+                double getLatitude = Double.parseDouble(String.format("%.5f", location.getLatitude()));
+                double getLongitude = Double.parseDouble(String.format("%.5f", location.getLongitude()));
+                // lat과 long의 변화량이 둘다 0일경우 속도 0으로 판정
+                if (latitude - getLatitude == 0 && longitude - getLongitude == 0){
+                    s = 0;
+                    s1 = 0;
+                } else {
+                    s = Double.parseDouble(String.format("%.5f", 3.6 * location.getSpeed()));
+                    s1 = location.getSpeed() * 3.6;
+                }
+                double getSpeed = s;
+                String getTimes = Time.getText().toString().substring(5,13);
+                // 데이터 타입 자체를 신경쓸것
+                double getDistance_per_sec = Double.parseDouble(String.format("%.5f", s1 * 10 / 36));
+                String getDatetime = mFormat.format(mDate);
+                HashMap<String, Object> result = new HashMap<>();
+                //o1_trainNo, o2_startLoc, o3_latitude, o4_longitude, o5_speed, o6_times, o7_distance_per_sec
+                result.put("trainNo", getTrainNo);
+                result.put("startLoc", getStartLocation);
+                result.put("latitude", getLatitude);
+                result.put("longitude", getLongitude);
+                result.put("speed", getSpeed);
+                result.put("times", getTimes);
+                result.put("distance_per_sec", getDistance_per_sec);
+                result.put("datetime", getDatetime);
+                writeNewUser(Integer.toString(i), getTrainNo, getStartLocation, getLatitude, getLongitude, getSpeed, getTimes, getDistance_per_sec, getDatetime);
+                i++;
+                latitude = Double.parseDouble(String.format("%.5f",location.getLatitude()));
+                longitude = Double.parseDouble(String.format("%.5f",location.getLongitude()));
 
-    private void writeNewUser (String userId, String trainNo, String startLoc,
-                                Double lat, Double longt, Double speed, String mvtm, Double mvst){
-        User user = new User(trainNo,startLoc, lat, longt, speed, mvtm, mvst);
+            }
+        };
+        return timerTask;
+    }
+
+
+    private void writeNewUser (String userId, String trainNo, String startLocation,
+                                double latitude, double longitude, double speed, String times, double distance_per_sec, String datetime){
+        User user = new User(trainNo, startLocation, latitude, longitude, speed, times, distance_per_sec, datetime);
         mDatabase.child(et_StartLoc.getText().toString()).child(userId).setValue(user)
                 .addOnFailureListener(new OnFailureListener() {
                     @Override
@@ -291,14 +343,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
             Seconds = (int) (UpdateTime / 1000);
 
-            Minutes = Seconds / 60;
+            Sec = Seconds % 60;
 
-            Seconds = Seconds % 60;
+            Minutes = Seconds / 60 % 60;
 
-            Hour = Seconds / 360;
+            Hour = Seconds / 3600;
 
             // TextView에 UpdateTime을 갱신해준다
-            Time.setText(String.format("%02d",Hour) + ":" + String.format("%02d",Minutes) + ":" + String.format("%02d", Seconds));
+            Time.setText("경과시간:" + String.format("%02d",Hour) + ":" + String.format("%02d",Minutes) + ":" + String.format("%02d", Sec));
 
             handler.postDelayed(this, 0);
 
