@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="tv">
+        <item>--열차종류--</item>
+        <item>KTX-산천</item>
+        <item>KTX</item>
+        <item>무궁화</item>
+        <item>ITX-새마을</item>
+    </string-array>
+    <string-array name="sl">
+        <item>--출발역--</item>
+
+    </string-array>
+    <string-array name="el">
+        <item>--도착역--</item>
+    </string-array>
+</resources>
