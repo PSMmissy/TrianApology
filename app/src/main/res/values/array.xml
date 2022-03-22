@@ -2,13 +2,23 @@
 <resources>
     <string-array name="tv">
         <item>--열차종류--</item>
-        <item>KTX-산천</item>
         <item>KTX</item>
         <item>무궁화</item>
         <item>ITX-새마을</item>
     </string-array>
     <string-array name="sl">
         <item>--출발역--</item>
+        <item>행신</item>
+        <item>서울</item>
+        <item>용산</item>
+        <item></item>
+        <item>행신</item>
+        <item>행신</item>
+        <item>행신</item>
+        <item>행신</item>
+        <item>행신</item>
+        <item>행신</item>
+
 
     </string-array>
     <string-array name="el">

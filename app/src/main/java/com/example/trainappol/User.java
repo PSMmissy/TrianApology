@@ -7,6 +7,7 @@ public class User {
 
     public String trainNo;
     public String startLocation;
+    public String endLocation;
     public double latitude;
     public double longitude;
     public double speed;
@@ -18,9 +19,10 @@ public class User {
 
     }
 
-    public User(String trainNo, String startLocation, double latitude, double longitude, double speed, String times, double distance_per_sec, String datetime){
+    public User(String trainNo, String startLocation, String endLocation, double latitude, double longitude, double speed, String times, double distance_per_sec, String datetime){
         this.trainNo = trainNo;
         this.startLocation = startLocation;
+        this.endLocation = endLocation;
         this.latitude = latitude;
         this.longitude = longitude;
         this.speed = speed;
@@ -42,6 +44,14 @@ public class User {
 
     public void setStartLocation(String startLocation){
         this.startLocation = startLocation;
+    }
+
+    public String getEndLocation(){
+        return endLocation;
+    }
+
+    public void setEndLocation(String endLocation){
+        this.endLocation = endLocation;
     }
 
     public double getLatitude(){
@@ -66,7 +76,7 @@ public class User {
         return times;
     }
 
-    public void setO6_times(String times){
+    public void setTimes(String times){
         this.times = times;
     }
 
