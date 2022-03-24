@@ -54,6 +54,4 @@ dependencies {
     implementation 'org.jetbrains.anko:anko:0.10.5'
     // Liva Data
     implementation "androidx.lifecycle:lifecycle-livedata:2.2.0"
-
-
 }
