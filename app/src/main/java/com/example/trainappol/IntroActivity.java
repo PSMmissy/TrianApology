@@ -1,5 +1,6 @@
 package com.example.trainappol;
 
+import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
@@ -19,12 +20,14 @@ public class IntroActivity extends AppCompatActivity {
         introThread.start();
     }
 
+    @SuppressLint("HandlerLeak")
     Handler handler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
             if (msg.what == 1) {
                 Intent intent = new Intent(IntroActivity.this, MapsActivity.class);
                 startActivity(intent);
+                finish();
             }
         }
     };

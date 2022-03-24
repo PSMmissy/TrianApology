@@ -78,6 +78,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     //키보드 숨기기 변수
     private InputMethodManager imm;
 
+    //뒤로가기 이벤트
+    private long backBtnTime = 0;
+
     //타이머 변수
     private TextView Time;
     private EditText et_TrainNo;
@@ -293,7 +296,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     Check_Termin.setText("측정종료");
                     Time.setText("경과시간:00:00:00");
                     Trkind.setText("");
-                    isRunning = ! isRunning;
+                    isRunning = !isRunning;
                     TimeBuff = 0L;
                     et_TrainNo.setText(null);
                     Check_Termin.setEnabled(false);
@@ -358,6 +361,23 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             return;
         }
         lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, ll);
+
+
+    }
+
+    // 뒤로가기 두번 누르면 종료 이벤트
+    @Override
+    public void onBackPressed() {
+        long curTime = System.currentTimeMillis();
+        long gapTime = curTime - backBtnTime;
+
+        if(0 <= gapTime && 2000 >= gapTime) {
+            super.onBackPressed();
+        }
+        else {
+            backBtnTime = curTime;
+            Toast.makeText(this, "뒤로가기를 한번더 누르면 앱이 종료됩니다.",Toast.LENGTH_SHORT).show();
+        }
 
 
     }
