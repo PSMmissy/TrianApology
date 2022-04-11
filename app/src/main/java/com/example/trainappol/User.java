@@ -10,21 +10,20 @@ public class User {
     public String endLocation;
     public double latitude;
     public double longitude;
+    public double altitude;
     public double speed;
     public String times;
     public double distance_per_sec;
     public String datetime;
 
-    public User(){
-
-    }
-
-    public User(String trainNo, String startLocation, String endLocation, double latitude, double longitude, double speed, String times, double distance_per_sec, String datetime){
+    public User(String trainNo, String startLocation, String endLocation, double latitude, double longitude,
+                double altitude, double speed, String times, double distance_per_sec, String datetime){
         this.trainNo = trainNo;
         this.startLocation = startLocation;
         this.endLocation = endLocation;
         this.latitude = latitude;
         this.longitude = longitude;
+        this.altitude = altitude;
         this.speed = speed;
         this.times = times;
         this.distance_per_sec = distance_per_sec;
@@ -64,6 +63,10 @@ public class User {
 
     public void setLongitude(double longitude){ this.longitude = longitude; }
 
+    public double getAltitude(){ return altitude;}
+
+    public void setAltitude(double altitude){ this.altitude = altitude; }
+
     public double getSpeed(){
         return speed;
     }
@@ -100,8 +103,10 @@ public class User {
         return "User{" +
                 "trainNo ='" + trainNo + '\'' +
                 ", startLocation ='" + startLocation + '\'' +
+                ", endLocation ='" + endLocation + '\'' +
                 ", latitude ='" + latitude + '\'' +
                 ", longitude ='" + longitude + '\'' +
+                ", altitude ='" + altitude + '\'' +
                 ", speed ='" + speed + '\'' +
                 ", times ='" + times + '\'' +
                 ", distance_per_sec ='" + distance_per_sec + '\'' +

@@ -19,6 +19,7 @@ import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
@@ -82,6 +83,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private long backBtnTime = 0;
 
     //타이머 변수
+    private boolean speed_notZero = true;
     private TextView Time;
     private EditText et_TrainNo;
     private TextView Slbtn;
@@ -151,6 +153,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private ArrayList<String> mInfoArray_s;
     private ArrayList<String> mInfoArray_e;
     private String trkind;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -191,10 +194,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
                     Trkind.setText(trkind);
                     mInfoArray_s.add(0, "출발역");
-                    Collections.reverse(mInfoArray_e);
+                    Collections.reverse(mInfoArray_e); // 도착역은, 출발역 열차와 역들은 같으나, 도착역을 찾기 쉽게 순서를 바꿔줌.
                     mInfoArray_e.add(0, "도착역");
-                    String[] arrs = mInfoArray_s.toArray(new String[mInfoArray_s.size()]);
-                    String[] arre = mInfoArray_e.toArray(new String[mInfoArray_e.size()]);
+                    String[] arrs = mInfoArray_s.toArray(new String[mInfoArray_s.size()]);// 출발역 아이템(출발역 명)들
+                    String[] arre = mInfoArray_e.toArray(new String[mInfoArray_e.size()]); // 도착역 아이템(도착역 명)들
                     Slbtn.setText(arrs[0]);
                     Elbtn.setText(arre[0]);
                     Slbtn.setOnClickListener(new View.OnClickListener() {
@@ -231,7 +234,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
 
         Time = findViewById(R.id.Time);
-        Time.setText("경과시간:00:00:00");
+        Time.setText("00:00:00");
         et_TrainNo = findViewById(R.id.edit2);
 
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
@@ -247,7 +250,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         Check_Start.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-
                 String Startlocation = Slbtn.getText().toString();
                 String EndLocation = Elbtn.getText().toString();
                 if (Startlocation.equals("출발역")  || EndLocation.equals("도착역")){
@@ -261,7 +263,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     });
                     AlertDialog alertDialog = builder.create();
                     alertDialog.show();
-                } else {
+                }else {
                     isRunning = !isRunning;
                     // SystemClock.uptimeMillis()는 디바이스를 부팅한후 부터 쉰 시간을 제외한 밀리초를 반환
                     StartTime = SystemClock.uptimeMillis();
@@ -269,7 +271,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     Check_Start.setEnabled(false);
                     Check_Termin.setEnabled(true);
                     Setbtn.setEnabled(false);
-                    Timer timer = new Timer();
+//                    Timer timer = new Timer();
                     et_TrainNo.setEnabled(false);
                     Slbtn.setEnabled(false);
                     Elbtn.setEnabled(false);
@@ -280,7 +282,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     longitude = Double.parseDouble(String.format("%.5f",location.getLongitude()));
                     mTimerTask = createTimertask();
                     mTimer.schedule(mTimerTask, 0, 1000);
-
                 }
             }
         });
@@ -293,8 +294,36 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     mTimerTask.cancel();
                 }
                 if(isRunning){
+                    String[] arrs = new String[0];
+                    String[] arre = new String[0];
+                    Slbtn.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View view) {
+                            AlertDialog.Builder dlg = new AlertDialog.Builder(MapsActivity.this);
+                            dlg.setTitle("출발역 선택").setItems(arrs, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialogInterface, int i) {
+                                    Slbtn.setText(arrs[i]);
+                                }
+                            });
+                            dlg.show();
+                        }
+                    });
+                    Elbtn.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View view) {
+                            AlertDialog.Builder dlg = new AlertDialog.Builder(MapsActivity.this);
+                            dlg.setTitle("도착역 선택").setItems(arre, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialogInterface, int i) {
+                                    Elbtn.setText(arre[i]);
+                                }
+                            });
+                            dlg.show();
+                        }
+                    });
                     Check_Termin.setText("측정종료");
-                    Time.setText("경과시간:00:00:00");
+                    Time.setText("00:00:00");
                     Trkind.setText("");
                     isRunning = !isRunning;
                     TimeBuff = 0L;
@@ -304,6 +333,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     Slbtn.setEnabled(true);
                     Elbtn.setEnabled(true);
                     Setbtn.setEnabled(true);
+                    speed_notZero = true;
                     Slbtn.setText("출발역");
                     Elbtn.setText("도착역");
                     Hour = 0;
@@ -364,6 +394,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
 
     }
+
 
     // 뒤로가기 두번 누르면 종료 이벤트
     @Override
@@ -440,6 +471,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 String getEndLocation = Elbtn.getText().toString();
                 double getLatitude = Double.parseDouble(String.format("%.5f", location.getLatitude()));
                 double getLongitude = Double.parseDouble(String.format("%.5f", location.getLongitude()));
+                double getAltitude = Double.parseDouble(String.format("%.5f", location.getAltitude()));
+                String resulttime = String.format("%02d",Hour) + ":" + String.format("%02d",Minutes) + ":" + String.format("%02d", Sec);
                 // lat과 long의 변화량이 둘다 0일경우 속도 0으로 판정
                 if (latitude - getLatitude == 0 && longitude - getLongitude == 0){
                     s = 0;
@@ -450,27 +483,36 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 }
 
                 double getSpeed = s;
-                String getTimes = Time.getText().toString().substring(5,13);
+                String getTimes = resulttime;
                 // 데이터 타입 자체를 신경쓸것
                 double getDistance_per_sec = Double.parseDouble(String.format("%.5f", s1 * 10 / 36));
                 String getDatetime = mFormat.format(mDate);
                 HashMap<String, Object> result = new HashMap<>();
                 //o1_trainNo, o2_startLoc, o3_latitude, o4_longitude, o5_speed, o6_times, o7_distance_per_sec
-                if (location.getSpeed() != 0 && getSpeed != 0) {
+                if (speed_notZero){
                     result.put("trainNo", getTrainNo);
                     result.put("startLoc", getStartLocation);
                     result.put("endLoc", getEndLocation);
                     result.put("latitude", getLatitude);
                     result.put("longitude", getLongitude);
+                    result.put("altitude", getAltitude);
                     result.put("speed", getSpeed);
                     result.put("distance_per_sec", getDistance_per_sec);
                     result.put("times", getTimes);
-                    result.put("datetime", getDatetime);
-                    writeNewUser(Integer.toString(i), getTrainNo, getStartLocation,getEndLocation, getLatitude, getLongitude, getSpeed, getTimes, getDistance_per_sec, getDatetime);
+                    result.put("datetime", getDatetime);//초당 데이터 쓰기!!
+                    writeNewUser(Integer.toString(i), getTrainNo, getStartLocation, getEndLocation, getLatitude,
+                                getLongitude, getAltitude, getSpeed, getTimes, getDistance_per_sec, getDatetime);
                     i++;
-                    latitude = Double.parseDouble(String.format("%.5f", location.getLatitude()));
-                    longitude = Double.parseDouble(String.format("%.5f", location.getLongitude()));
                 }
+
+                if (getSpeed == 0 || location.getSpeed() == 0){
+                    speed_notZero = false;
+                }else{
+                    speed_notZero = true;
+                }
+                latitude = Double.parseDouble(String.format("%.5f", location.getLatitude()));
+                longitude = Double.parseDouble(String.format("%.5f", location.getLongitude()));
+
 
             }
         };
@@ -479,8 +521,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     //얻어온 값들을 FBDB에 쓰기
     private void writeNewUser (String userId, String trainNo, String startLocation, String endLocation,
-                                double latitude, double longitude, double speed, String times, double distance_per_sec, String datetime){
-        User user = new User(trainNo, startLocation,endLocation, latitude, longitude, speed, times, distance_per_sec, datetime);
+                                double latitude, double longitude, double altitude, double speed, String times, double distance_per_sec, String datetime){
+        User user = new User(trainNo, startLocation,endLocation, latitude, longitude, altitude, speed, times, distance_per_sec, datetime);
         mDatabase.child(Trkind.getText().toString() + "-" + et_TrainNo.getText().toString() + "-" + Slbtn.getText().toString() + "-" + Elbtn.getText().toString())
                 .child(userId).setValue(user)
                 .addOnFailureListener(new OnFailureListener() {
@@ -526,7 +568,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             Hour = Seconds / 3600;
 
             // TextView에 UpdateTime을 갱신해준다
-            String result = "경과시간:" + String.format("%02d",Hour) + ":" + String.format("%02d",Minutes) + ":" + String.format("%02d", Sec);
+            String result = String.format("%02d",Hour) + ":" + String.format("%02d",Minutes) + ":" + String.format("%02d", Sec);
             Time.setText(result);
 
             handler.postDelayed(this, 0);
@@ -543,9 +585,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             if (location != null){
                 mySpeed = 3.6 * location.getSpeed();
                 Double Distance = mySpeed * 10 / 36 ;
-                //속도는 여기입니다
-                V.setText("현재속도:\n" +String.format("%.2f", mySpeed) + " km/h");
-                D.setText("1초동안 이동한 거리: \n" + String.format( "%.2f",Distance) +" m");
+                //속도
+                V.setText(String.format("%.2f", mySpeed) + " km/h");
+                D.setText(String.format( "%.2f",Distance) +" m");
+                V.setGravity(Gravity.CENTER);
+                D.setGravity(Gravity.CENTER);
 
             }
         }
@@ -583,7 +627,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
 
         //런타임 퍼미션 처리
-        // 1. 위치 퍼미션을 가지고 있는지 체크합니다.
+        // 1. 위치 퍼미션을 가지고 있는지 체크.
         int hasFineLocationPermission = ContextCompat.checkSelfPermission(this,
                 Manifest.permission.ACCESS_FINE_LOCATION);
         int hasCoarseLocationPermission = ContextCompat.checkSelfPermission(this,
@@ -595,25 +639,25 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 hasCoarseLocationPermission == PackageManager.PERMISSION_GRANTED   ) {
 
             // 2. 이미 퍼미션을 가지고 있다면
-            // ( 안드로이드 6.0 이하 버전은 런타임 퍼미션이 필요없기 때문에 이미 허용된 걸로 인식합니다.)
+            // ( 안드로이드 6.0 이하 버전은 런타임 퍼미션이 필요없기 때문에 이미 허용된 걸로 인식됨.)
 
 
             startLocationUpdates(); // 3. 위치 업데이트 시작
 
 
-        }else {  //2. 퍼미션 요청을 허용한 적이 없다면 퍼미션 요청이 필요합니다. 2가지 경우(3-1, 4-1)가 있습니다.
+        }else {  //2. 퍼미션 요청을 허용한 적이 없다면 퍼미션 요청이 필요함. 2가지 경우(3-1, 4-1)가 있음.
 
             // 3-1. 사용자가 퍼미션 거부를 한 적이 있는 경우에는
             if (ActivityCompat.shouldShowRequestPermissionRationale(this, REQUIRED_PERMISSIONS[0])) {
 
-                // 3-2. 요청을 진행하기 전에 사용자가에게 퍼미션이 필요한 이유를 설명해줄 필요가 있습니다.
+                // 3-2. 요청을 진행하기 전에 사용자가에게 퍼미션이 필요한 이유를 설명해 줘야함.
                 Snackbar.make(mLayout, "이 앱을 실행하려면 위치 접근 권한이 필요합니다.",
                         Snackbar.LENGTH_INDEFINITE).setAction("확인", new View.OnClickListener() {
 
                     @Override
                     public void onClick(View view) {
 
-                        // 3-3. 사용자게에 퍼미션 요청을 합니다. 요청 결과는 onRequestPermissionResult에서 수신됩니다.
+                        // 3-3. 사용자게에 퍼미션 요청. 요청 결과는 onRequestPermissionResult에서 수신됨.
                         ActivityCompat.requestPermissions( MapsActivity.this, REQUIRED_PERMISSIONS,
                                 PERMISSIONS_REQUEST_CODE);
                     }
@@ -621,8 +665,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
 
             } else {
-                // 4-1. 사용자가 퍼미션 거부를 한 적이 없는 경우에는 퍼미션 요청을 바로 합니다.
-                // 요청 결과는 onRequestPermissionResult에서 수신됩니다.
+                // 4-1. 사용자가 퍼미션 거부를 한 적이 없는 경우에는 퍼미션 요청 즉각 실행.
+                // 요청 결과는 onRequestPermissionResult에서 수신됨.
                 ActivityCompat.requestPermissions( this, REQUIRED_PERMISSIONS,
                         PERMISSIONS_REQUEST_CODE);
             }
@@ -651,12 +695,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             super.onLocationResult(locationResult);
             //map collection priod
             TextView LatLong = findViewById(R.id.latlong);
-            int i;
+            TextView Longi = findViewById(R.id.longi);
+            TextView Alti = findViewById(R.id.alti);
 
             List<Location> locationList = locationResult.getLocations();
             if (locationList.size() > 0) {
                 location = locationList.get(locationList.size() - 1);
-                //location = locationList.get(0);
 
                 currentPosition
                         = new LatLng(location.getLatitude(), location.getLongitude());
@@ -664,15 +708,18 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
                 String markerTitle = getCurrentAddress(currentPosition);
                 String markerSnippet = "위도:" + location.getLatitude()
-                        + "\n경도:" + location.getLongitude();
+                        + "\n경도:" + location.getLongitude() + "\n고도:" + location.getAltitude();
 
                 Log.d(TAG, "onLocationResult : " + markerSnippet);
 
 
 
-                LatLong.setText("위도: " + String.format("%.3f",location.getLatitude()) + "\n경도: " + String.format("%.3f",location.getLongitude()) );
+                LatLong.setText(String.format("%.3f",location.getLatitude()));
+                Longi.setText(String.format("%.3f",location.getLongitude()));
+                Alti.setText(String.format("%.3f",location.getAltitude()));
 
-                //현재 위치에 마커 생성하고 이동
+
+                        //현재 위치에 마커 생성하고 이동
                 setCurrentLocation(location, markerTitle, markerSnippet);
                 mCurrentLocatiion = location;
             }
@@ -861,7 +908,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
 
     /*
-     * ActivityCompat.requestPermissions를 사용한 퍼미션 요청의 결과를 리턴받는 메소드입니다.
+     * ActivityCompat.requestPermissions를 사용한 퍼미션 요청의 결과를 리턴받는 메소드.
      */
     @SuppressLint("MissingSuperCall")
     @Override
@@ -876,7 +923,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             boolean check_result = true;
 
 
-            // 모든 퍼미션을 허용했는지 체크합니다.
+            // 모든 퍼미션을 허용했는지 체크.
 
             for (int result : grandResults) {
                 if (result != PackageManager.PERMISSION_GRANTED) {
@@ -888,17 +935,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
             if ( check_result ) {
 
-                // 퍼미션을 허용했다면 위치 업데이트를 시작합니다.
+                // 퍼미션을 허용했다면 위치 업데이트 시작.
                 startLocationUpdates();
             }
             else {
-                // 거부한 퍼미션이 있다면 앱을 사용할 수 없는 이유를 설명해주고 앱을 종료합니다.2 가지 경우가 있습니다.
+                // 거부한 퍼미션이 있다면 앱을 사용할 수 없는 이유를 설명해주고 앱 종료.2 가지 경우가 있음.
 
                 if (ActivityCompat.shouldShowRequestPermissionRationale(this, REQUIRED_PERMISSIONS[0])
                         || ActivityCompat.shouldShowRequestPermissionRationale(this, REQUIRED_PERMISSIONS[1])) {
 
 
-                    // 사용자가 거부만 선택한 경우에는 앱을 다시 실행하여 허용을 선택하면 앱을 사용할 수 있습니다.
+                    // 사용자가 거부만 선택한 경우에는 앱을 다시 실행하여 허용을 선택하면 앱 사용가능.
                     Snackbar.make(mLayout, "퍼미션이 거부되었습니다. 앱을 다시 실행하여 퍼미션을 허용해주세요. ",
                             Snackbar.LENGTH_INDEFINITE).setAction("확인", new View.OnClickListener() {
 
@@ -912,7 +959,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 }else {
 
 
-                    // "다시 묻지 않음"을 사용자가 체크하고 거부를 선택한 경우에는 설정(앱 정보)에서 퍼미션을 허용해야 앱을 사용할 수 있습니다.
+                    // "다시 묻지 않음"을 사용자가 체크하고 거부를 선택한 경우에는 설정(앱 정보)에서 퍼미션을 허용해야 앱 사용 가능.
                     Snackbar.make(mLayout, "퍼미션이 거부되었습니다. 설정(앱 정보)에서 퍼미션을 허용해야 합니다. ",
                             Snackbar.LENGTH_INDEFINITE).setAction("확인", new View.OnClickListener() {
 
@@ -983,7 +1030,3 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
 
 }
-
-
-
-
