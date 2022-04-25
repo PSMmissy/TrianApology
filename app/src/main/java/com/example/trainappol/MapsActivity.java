@@ -328,6 +328,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     });
                     AlertDialog alertDialog = builder.create();
                     alertDialog.show();
+                }else if(mInfoArray_s.indexOf(Elbtn.getText().toString()) <= mInfoArray_s.indexOf(Slbtn.getText().toString())){
+                    AlertDialog.Builder builder = new AlertDialog.Builder(MapsActivity.this);
+                    builder.setTitle("알림").setMessage("열차의 진행방향 기준으로, \n도착역의 정거장이 출발역의 정거장보다 뒤에 있을 수 없습니다. \n올바르게 선택하여 주세요.");
+                    builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                        }
+                    });
+                    AlertDialog alertDialog = builder.create();
+                    alertDialog.show();
                 }else {
                     try {
                         SQLiteHelper.DATABASE_NAME = mFormat2.format(System.currentTimeMillis()) + ".db";
@@ -536,22 +546,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
         return super.dispatchTouchEvent(ev);
     }
-    //내부 DB 탐색을 위한 커서 이벤트
+    //내부DB에 저장된 열차정보 중, 출발,도착역을 탐색하기 위한 커서 메서드
     private void doWhileCursorToArray(){
         mCursor = null;
         mCursor = mDBOpenHelper.getStName(et_TrainNo.getText().toString());
 
         while (mCursor.moveToNext()){
             int index = mCursor.getColumnIndex("info_st_nm");
-//            mInfoClass = new InfoClass(
-//                    mCursor.getString(index)
-//            );
             mInfoArray_s.add(mCursor.getString(index));
             mInfoArray_e.add(mCursor.getString(index));
         }
         mCursor.close();
     }
-    //내부 DB 탐색을 통해, 열차의 종류 얻어오기
+    //내부DB에 저장된 열차정보 중, 열차종류를 탐색하기 위한 커서 메서드
     private void getStringCursor(){
         mCursor = null;
         mCursor = mDBOpenHelper.getTrKind(et_TrainNo.getText().toString());
@@ -561,7 +568,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
         mCursor.close();
     }
-    //FireBase RTDB 활성화 메소드
+    //측정용 SQLite 활성화 메소드
     @NonNull
     private TimerTask createTimertask(){
         TimerTask timerTask = new TimerTask() {
@@ -1142,15 +1149,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
         }
     }
+    // 내부 저장소에 측정한 값을 CSV 파일로 저장하기 위한 클래스
     public class BackTasking extends AsyncTask<String, Void, Boolean> {
         private final ProgressDialog dialog = new ProgressDialog(MapsActivity.this);
         private Date mDate2;
 
+        // Export CSV의 진행도를 보여주는 ProgressBar
         @Override
         protected void onPreExecute() {
             this.dialog.setMessage("데이터 내보내는 중...");
             this.dialog.show();
         }
+        // 측정한 값이 저장된 DB를 읽고 커서를 통해 CSV로 옮겨 쓴 후, 지정된 경로에 저장
+        //경로: /storage/emulated/0/export
         protected Boolean doInBackground(final String... args) {
             String sltext = Slbtn.getText().toString();
             String eltext = Elbtn.getText().toString();
@@ -1171,10 +1182,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             File file = new File(exportDir, date + "-" + tntext + "-" + tktext + "-" + sltext + "-" + eltext + CSV);
             try {
                 file.createNewFile();
+                // 기존엔 FileWriter 메서드를 사용하였으나, 한글이 깨지는 현상이 발생하여, BufferedWriter를 사용하여, euc-kr 로 인코딩하였음.
                 CSVWriter csvWrite = new CSVWriter(new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file), "euc-kr")));
                 db = myDBHelper.getWritableDatabase();
                 Cursor curCSV = db.rawQuery("select * from " + myDBHelper.TABLE_NAME, null);
                 csvWrite.writeNext(curCSV.getColumnNames());
+                //커서를 이용하여 DB값 하나하나 탐색한 후, CSV로 옮겨주는 작업
                 while (curCSV.moveToNext()) {
                     String arrStr[] = null;
                     String[] mySecondStringArray = new String[curCSV.getColumnNames().length];
@@ -1192,6 +1205,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 return false;
             }
         }
+        //doInBackground 함수 리턴값이 true라면 저장 성공, false라면 저장 실패.
         protected void onPostExecute(final Boolean success) {
             if (this.dialog.isShowing()) {
                 this.dialog.dismiss();
