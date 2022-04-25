@@ -2,20 +2,26 @@ package com.example.trainappol;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
@@ -25,6 +31,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -50,15 +57,14 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
-import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.material.snackbar.Snackbar;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -132,6 +138,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     LatLng currentPosition;
 
 
+
     private FusedLocationProviderClient mFusedLocationClient;
     private LocationRequest locationRequest;
     private Location location;
@@ -141,7 +148,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     //Date Types of in
     private long mNow;
     private Date mDate;
+    private String mDB;
+    private String database_name;
     private final SimpleDateFormat mFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
+    private final SimpleDateFormat mFormat2 = new SimpleDateFormat("yyyy-MM-dd-hh-mm-ss");
+    private SimpleDateFormat mFormat3 = new SimpleDateFormat("yyMMddhhmmss");
 
     private View mLayout;  // Snackbar 사용하기 위해서는 View가 필요합니다.
     // (참고로 Toast에서는 Context가 필요했습니다.)
@@ -158,18 +169,26 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private String[] arre;
     private String trkind;
 
+
+    private SQLiteDatabase db;
+
+
+    // 프로그래스바
+    private ProgressBar progressBar;
+    private BackTasking task;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
 
+        askForPermissions();
+        checkPermission2();
+        task = new BackTasking();
         imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
         mDBOpenHelper = new DBOpenHelper(this);
         mDBOpenHelper.open();
-        Slbtn = findViewById(R.id.slbtn);
-        Elbtn = findViewById(R.id.elbtn);
-        Setbtn = findViewById(R.id.btn3);
-        Trkind = findViewById(R.id.trkind);
+        mInit();
         mInfoArray_s = new ArrayList<String>();
         mInfoArray_e = new ArrayList<String>();
         trkind = "";
@@ -311,6 +330,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     alertDialog.show();
                 }else {
                     try {
+                        SQLiteHelper.DATABASE_NAME = mFormat2.format(System.currentTimeMillis()) + ".db";
+                        SQLiteHelper myDBHelper = new SQLiteHelper(MapsActivity.this);
+                        database_name = SQLiteHelper.DATABASE_NAME;
+                        mDB = SQLiteHelper.TABLE_NAME;
                         Check_Termin.setText("일시정지");
                         isRunning = !isRunning;
                         // SystemClock.uptimeMillis()는 디바이스를 부팅한후 부터 쉰 시간을 제외한 밀리초를 반환
@@ -323,16 +346,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         et_TrainNo.setEnabled(false);
                         Slbtn.setEnabled(false);
                         Elbtn.setEnabled(false);
-                        mDatabase = FirebaseDatabase.getInstance("https://zippy-elf-341602-default-rtdb.firebaseio.com/").getReference();
-                        readUser();
                         latitude = Double.parseDouble(String.format("%.5f", location.getLatitude()));
                         longitude = Double.parseDouble(String.format("%.5f", location.getLongitude()));
+                        db = myDBHelper.getWritableDatabase();
                         mTimerTask = createTimertask();
                         mTimer.schedule(mTimerTask, 0, 1000);
+                        Toast.makeText(getApplicationContext(),"측정을 시작합니다.", Toast.LENGTH_SHORT).show();
                     }
                     catch (NullPointerException ne){
                         AlertDialog.Builder builder = new AlertDialog.Builder(MapsActivity.this);
-                        builder.setTitle("알림").setMessage("GPS 초기 좌표를 잡는 중입니다. 장시간 지속 시, GPS를 끄고 다시 켜 주세요.");
+                        builder.setTitle("오류").setMessage("GPS 초기 좌표를 잡는 중입니다. 오류 지속 시, GPS를 끄고 다시 켜 주세요.");
                         builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialogInterface, int i) {
@@ -387,6 +410,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                             dlg.show();
                                         }
                                     });
+
+                                    task.execute();
+                                    Toast.makeText(MapsActivity.this, "측정을 종료합니다.", Toast.LENGTH_SHORT).show();
                                     Check_Termin.setText("측정종료");
                                     Time.setText("00:00:00");
                                     Trkind.setText("");
@@ -405,7 +431,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                     Minutes = 0;
                                     Sec = 0;
                                     Seconds = 0;
-                                    Toast.makeText(MapsActivity.this, "측정을 종료합니다.", Toast.LENGTH_SHORT).show();
                                 }
                             });
                     dlg.show();
@@ -465,6 +490,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, ll);
 
 
+    }
+    private void mInit(){
+        Slbtn = findViewById(R.id.slbtn);
+        Elbtn = findViewById(R.id.elbtn);
+        Setbtn = findViewById(R.id.btn3);
+        Trkind = findViewById(R.id.trkind);
     }
 
 
@@ -572,7 +603,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     result.put("distance_per_sec", getDistance_per_sec);
                     result.put("times", getTimes);
                     result.put("datetime", getDatetime);//초당 데이터 쓰기!!
-                    writeNewUser(Integer.toString(num), getTrainNo, getStartLocation, getEndLocation, getLatitude,
+                    writeNewUser(db, mDB, num, getTrainNo, getStartLocation, getEndLocation, getLatitude,
                             getLongitude, getAltitude, getSpeed, getTimes, getDistance_per_sec, getDatetime);
                     num++;
                 }
@@ -591,7 +622,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         result.put("distance_per_sec", getDistance_per_sec);
                         result.put("times", getTimes);
                         result.put("datetime", getDatetime);//초당 데이터 쓰기!!
-                        writeNewUser(Integer.toString(num), getTrainNo, getStartLocation, getEndLocation, getLatitude,
+                        writeNewUser(db, mDB, num, getTrainNo, getStartLocation, getEndLocation, getLatitude,
                                 getLongitude, getAltitude, getSpeed, getTimes, getDistance_per_sec, getDatetime);
                         num++;
                     }
@@ -607,38 +638,28 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
 
-    //얻어온 값들을 FBDB에 쓰기
-    private void writeNewUser (String userId, String trainNo, String startLocation, String endLocation,
+    //얻어온 값들을 SQLite에 쓰기
+    private void writeNewUser (SQLiteDatabase db, String mDB, int num, String trainNo, String startLocation, String endLocation,
                                 double latitude, double longitude, double altitude, double speed, String times, double distance_per_sec, String datetime){
-        User user = new User(trainNo, startLocation,endLocation, latitude, longitude, altitude, speed, times, distance_per_sec, datetime);
-        mDatabase.child(Trkind.getText().toString() + "-" + et_TrainNo.getText().toString() + "-" + Slbtn.getText().toString() + "-" + Elbtn.getText().toString())
-                .child(userId).setValue(user)
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
-                        // 데이터 쓰기 실패 시
-                        Toast.makeText(MapsActivity.this, "저장에 실패했습니다.", Toast.LENGTH_SHORT).show();
-                    }
-                });
-    }
-    //쓸일은 없으나, 이벤트 호환을 위해 FBDB 읽기 수행
-    private void readUser(){
-        mDatabase.child("users").child("1").addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                if(dataSnapshot.getValue(User.class) != null) {
-                    User post = dataSnapshot.getValue(User.class);
-                    Log.w("FireBaseData", "getData" + post.toString());
-                } else{
-                    Toast.makeText(MapsActivity.this, "데이터 적재 시작", Toast.LENGTH_SHORT).show();
-                }
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError databaseError) {
-                Log.w("FireBaseData", "loadPost: onCancelled", databaseError.toException());
-            }
-        });
+        String id = Integer.toString(num);
+        String lati = Double.toString(latitude);
+        String logi = Double.toString(longitude);
+        String alti = Double.toString(altitude);
+        String spd = Double.toString(speed);
+        String dps = Double.toString(distance_per_sec);
+        String INSERT_INTO =  "INSERT INTO " + mDB + "(id, trainNo, startLocation, endLocation, latitude, longitude, altitude, speed, times, distance_per_sec, datetime) "
+                + "VALUES(" + id
+                + " ,'" + trainNo + "'"
+                + " ,'" + startLocation + "'"
+                + " ,'" + endLocation + "'"
+                + " ,'" + lati + "'"
+                + " ,'" + logi + "'"
+                + " ,'" + alti + "'"
+                + " ,'" + spd + "'"
+                + " ,'" + times + "'"
+                + " ,'" + dps + "'"
+                + " ,'" + datetime + "');";
+        db.execSQL(INSERT_INTO);
     }
     //스탑워치 이벤트
     public Runnable runnable = new Runnable() {
@@ -1112,6 +1133,86 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 }
 
                 break;
+        }
+    }
+    public void checkPermission2(){
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if(checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED){
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
+            }
+        }
+    }
+    public class BackTasking extends AsyncTask<String, Void, Boolean> {
+        private final ProgressDialog dialog = new ProgressDialog(MapsActivity.this);
+        private Date mDate2;
+
+        @Override
+        protected void onPreExecute() {
+            this.dialog.setMessage("데이터 내보내는 중...");
+            this.dialog.show();
+        }
+        protected Boolean doInBackground(final String... args) {
+            String sltext = Slbtn.getText().toString();
+            String eltext = Elbtn.getText().toString();
+            String tktext = Trkind.getText().toString();
+            String tntext = et_TrainNo.getText().toString();
+            mDate2 = new Date(mNow);
+            String date = mFormat3.format(mDate2);
+            final String CSV = ".csv";
+            SQLiteHelper myDBHelper = new SQLiteHelper(MapsActivity.this);
+            String currentDBPath = "/data/com.example.trainappol/databases/" + myDBHelper.DATABASE_NAME;
+            File dbFile = getDatabasePath(currentDBPath);
+            System.out.println(dbFile);
+            File exportDir = new File("/storage/emulated/0/export/");
+            if (!exportDir.exists()) {
+                exportDir.mkdirs();
+            }
+
+            File file = new File(exportDir, date + "-" + tntext + "-" + tktext + "-" + sltext + "-" + eltext + CSV);
+            try {
+                file.createNewFile();
+                CSVWriter csvWrite = new CSVWriter(new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file), "euc-kr")));
+                db = myDBHelper.getWritableDatabase();
+                Cursor curCSV = db.rawQuery("select * from " + myDBHelper.TABLE_NAME, null);
+                csvWrite.writeNext(curCSV.getColumnNames());
+                while (curCSV.moveToNext()) {
+                    String arrStr[] = null;
+                    String[] mySecondStringArray = new String[curCSV.getColumnNames().length];
+                    for (int i = 0; i < curCSV.getColumnNames().length; i++) {
+                        mySecondStringArray[i] = curCSV.getString(i);
+                    }
+                    csvWrite.writeNext(mySecondStringArray);
+                }
+                csvWrite.close();
+                curCSV.close();
+                dbFile.delete();
+                return true;
+            } catch (IOException e) {
+                Log.e("MapsActivity", e.getMessage(), e);
+                return false;
+            }
+        }
+        protected void onPostExecute(final Boolean success) {
+            if (this.dialog.isShowing()) {
+                this.dialog.dismiss();
+            }
+            if (success) {
+                Toast.makeText(MapsActivity.this, "데이터 저장에 성공하였습니다.", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(MapsActivity.this, "데이터 저장에 실패하였습니다.", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+
+
+    public void askForPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                startActivity(intent);
+                return;
+            }
         }
     }
 
