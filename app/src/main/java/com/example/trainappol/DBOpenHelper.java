@@ -41,7 +41,7 @@ public class DBOpenHelper {
             if (mDataBase != null){
                 mDataBase.close();
             }
-            super.close();;
+            super.close();
         }
         @Override
         public void onCreate(SQLiteDatabase db){

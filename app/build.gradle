@@ -7,7 +7,7 @@ android {
 
     defaultConfig {
         applicationId "com.example.trainappol"
-        minSdk 21
+        minSdk 25
         targetSdk 32
         versionCode 1
         versionName "1.0"
@@ -22,8 +22,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility sourceCompatibility
+        targetCompatibility targetCompatibility
     }
     buildFeatures {
         viewBinding true
@@ -42,7 +42,7 @@ dependencies {
     implementation 'com.google.android.gms:play-services-maps:18.0.1'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.2'
     implementation 'androidx.room:room-common:2.2.6'
-    implementation 'com.google.firebase:firebase-firestore:24.0.1'
+
 
 //    implementation 'androidx.databinding:compilerCommon:3.2.0-alpha11'
     testImplementation 'junit:junit:4.+'

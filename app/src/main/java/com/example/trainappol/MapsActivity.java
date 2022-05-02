@@ -2,20 +2,26 @@ package com.example.trainappol;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
@@ -25,6 +31,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -50,15 +57,14 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
-import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.snackbar.Snackbar;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -90,7 +96,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private TextView Elbtn;
     private AppCompatButton Setbtn;
     private TextView Trkind;
-
+    private FloatingActionButton myFAB;
     private long MillisecondTime = 0L;  // 측정 시작 버튼을 누르고 흐른 시간
     private long StartTime = 0L;        // 측정 시작 버튼 누르고 난 이후 부터의 시간
     long TimeBuff = 0L;         // 측정 종료 버튼 눌렀을 때의 총 시간
@@ -100,6 +106,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private double longitude;
     private double s, s1;
     private boolean isRunning = false; // 타이머 작동중
+    private boolean isEstimate = false; // 측정 진행중
     private double lt;
     private double lg;
 
@@ -132,16 +139,20 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     LatLng currentPosition;
 
 
+
     private FusedLocationProviderClient mFusedLocationClient;
     private LocationRequest locationRequest;
     private Location location;
     private final Timer mTimer = new Timer();
     private TimerTask mTimerTask;
-    private DatabaseReference mDatabase;
     //Date Types of in
     private long mNow;
     private Date mDate;
-    private final SimpleDateFormat mFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
+    private String mDB;
+    private String database_name;
+    private final SimpleDateFormat mFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    private final SimpleDateFormat mFormat2 = new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss");
+    private SimpleDateFormat mFormat3 = new SimpleDateFormat("yyMMddHHmmss");
 
     private View mLayout;  // Snackbar 사용하기 위해서는 View가 필요합니다.
     // (참고로 Toast에서는 Context가 필요했습니다.)
@@ -149,6 +160,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     //SQLite 변수들
     private DBOpenHelper mDBOpenHelper;
+    private DTlogHelper mDTLogHelper;
     private Cursor mCursor;
     private InfoClass mInfoClass;
 //    private ArrayList<InfoClass> mInfoArray;
@@ -158,18 +170,35 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private String[] arre;
     private String trkind;
 
+
+    private SQLiteDatabase db;
+    private DTlogHelper logDB;
+
+    // 프로그래스바
+    private ProgressBar progressBar;
+    private BackTasking task;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
 
+        askForPermissions();
+        checkPermission2();
+        task = new BackTasking();
         imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
         mDBOpenHelper = new DBOpenHelper(this);
+        mDTLogHelper = new DTlogHelper(this);
         mDBOpenHelper.open();
-        Slbtn = findViewById(R.id.slbtn);
-        Elbtn = findViewById(R.id.elbtn);
-        Setbtn = findViewById(R.id.btn3);
-        Trkind = findViewById(R.id.trkind);
+        mDTLogHelper.open();
+        mInit();
+        myFAB.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent intent = new Intent(getApplicationContext(),SubActivity.class);
+                startActivity(intent);
+            }
+        });
         mInfoArray_s = new ArrayList<String>();
         mInfoArray_e = new ArrayList<String>();
         trkind = "";
@@ -224,9 +253,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     AlertDialog.Builder alg = new AlertDialog.Builder(MapsActivity.this);
 
                     Trkind.setText(trkind);
-                    //mInfoArray_s.add(0, "출발역선택");
                     Collections.reverse(mInfoArray_e); // 도착역은, 출발역 열차와 역들은 같으나, 도착역을 찾기 쉽게 순서를 바꿔줌.
-                    //mInfoArray_e.add(0, "도착역선택");
                     arrs = mInfoArray_s.toArray(new String[mInfoArray_s.size()]);// 출발역 아이템(출발역 명)들
                     arre = mInfoArray_e.toArray(new String[mInfoArray_e.size()]); // 도착역 아이템(도착역 명)들
                     Slbtn.setText(arrs[0]);
@@ -296,6 +323,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         Check_Start.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                String TrainNum = et_TrainNo.getText().toString();
+                String TrainKid = Trkind.getText().toString();
                 String Startlocation = Slbtn.getText().toString();
                 String EndLocation = Elbtn.getText().toString();
                 if (Startlocation.equals("출발역")  || EndLocation.equals("도착역")){
@@ -304,49 +333,89 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialogInterface, int i) {
-                            Toast.makeText(getApplicationContext(),"Please, Set Start and End Station Name.",Toast.LENGTH_SHORT).show();
+                            Toast.makeText(getApplicationContext(),
+                                    "Please, Set Start and End Station Name.",Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                    AlertDialog alertDialog = builder.create();
+                    alertDialog.show();
+                }else if(mInfoArray_s.indexOf(Elbtn.getText().toString()) <= mInfoArray_s.indexOf(Slbtn.getText().toString())){
+                    AlertDialog.Builder builder = new AlertDialog.Builder(MapsActivity.this);
+                    builder.setTitle("알림").setMessage("열차의 진행방향 기준으로, " +
+                            "\n도착역의 정거장이 출발역의 정거장보다 뒤에 있을 수 없습니다. \n올바르게 선택하여 주세요.");
+                    builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
                         }
                     });
                     AlertDialog alertDialog = builder.create();
                     alertDialog.show();
                 }else {
-                    try {
-                        Check_Termin.setText("일시정지");
-                        isRunning = !isRunning;
-                        // SystemClock.uptimeMillis()는 디바이스를 부팅한후 부터 쉰 시간을 제외한 밀리초를 반환
-                        StartTime = SystemClock.uptimeMillis();
-                        handler.postDelayed(runnable, 0);
-                        Check_Start.setEnabled(false);
-                        Check_Termin.setEnabled(true);
-                        Setbtn.setEnabled(false);
-//                    Timer timer = new Timer();
-                        et_TrainNo.setEnabled(false);
-                        Slbtn.setEnabled(false);
-                        Elbtn.setEnabled(false);
-                        mDatabase = FirebaseDatabase.getInstance("https://zippy-elf-341602-default-rtdb.firebaseio.com/").getReference();
-                        readUser();
-                        latitude = Double.parseDouble(String.format("%.5f", location.getLatitude()));
-                        longitude = Double.parseDouble(String.format("%.5f", location.getLongitude()));
-                        mTimerTask = createTimertask();
-                        mTimer.schedule(mTimerTask, 0, 1000);
-                    }
-                    catch (NullPointerException ne){
-                        AlertDialog.Builder builder = new AlertDialog.Builder(MapsActivity.this);
-                        builder.setTitle("알림").setMessage("GPS 초기 좌표를 잡는 중입니다. 장시간 지속 시, GPS를 끄고 다시 켜 주세요.");
-                        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialogInterface, int i) {
+                    AlertDialog.Builder dlg = new AlertDialog.Builder(MapsActivity.this);
+                    dlg.setTitle("알림").setMessage("- 열차번호: " + TrainNum + "\n" +
+                            "- 열차종류: " + TrainKid + "\n" + "- 출발역명: " + Startlocation + "\n" +
+                            "- 도착역명: " + EndLocation + "\n위 정보로 측정을 시작하시겠습니까?");
+                    dlg.setNegativeButton("Yes", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            try {
+                                hideFAB();
+                                SQLiteHelper.DATABASE_NAME = mFormat2.format(System.currentTimeMillis()) + ".db";
+                                SQLiteHelper myDBHelper = new SQLiteHelper(MapsActivity.this);
+                                database_name = SQLiteHelper.DATABASE_NAME.replace(".db","");
+                                mDB = SQLiteHelper.TABLE_NAME;
+                                Check_Termin.setText("일시정지");
+                                isRunning = !isRunning;
+                                // SystemClock.uptimeMillis()는 디바이스를 부팅한후 부터 쉰 시간을 제외한 밀리초를 반환
+                                StartTime = SystemClock.uptimeMillis();
+                                handler.postDelayed(runnable, 0);
+                                Check_Start.setEnabled(false);
+                                Check_Termin.setEnabled(true);
+                                Setbtn.setEnabled(false);
+//                              Timer timer = new Timer();
+                                et_TrainNo.setEnabled(false);
+                                Slbtn.setEnabled(false);
+                                Elbtn.setEnabled(false);
+                                latitude = Double.parseDouble(String.format("%.5f", location.getLatitude()));
+                                longitude = Double.parseDouble(String.format("%.5f", location.getLongitude()));
+                                db = myDBHelper.getWritableDatabase();
+                                mTimerTask = createTimertask();
+                                mTimer.schedule(mTimerTask, 0, 1000);
+                                Toast.makeText(getApplicationContext(),
+                                        "측정을 시작합니다.", Toast.LENGTH_SHORT).show();
                             }
-                        });
-                        AlertDialog alertDialog = builder.create();
-                        alertDialog.show();
-                    }
+                            catch (NullPointerException ne){
+                                AlertDialog.Builder builder = new AlertDialog.Builder(MapsActivity.this);
+                                builder.setTitle("오류").setMessage("GPS 초기 좌표를 잡는 중입니다. 오류 지속 시, GPS를 끄고 다시 켜 주세요.");
+                                builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface dialogInterface, int i) {
+                                    }
+                                });
+                                AlertDialog alertDialog = builder.create();
+                                alertDialog.show();
+                            }
+                        }
+                    }).setPositiveButton("No", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                        }
+                    });
+                    AlertDialog alertDialog = dlg.create();
+                    alertDialog.show();
+
                 }
+
             }
         });
         Check_Termin.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                String Date = mFormat3.format(System.currentTimeMillis());
+                String TrainNum = et_TrainNo.getText().toString();
+                String TrainKid = Trkind.getText().toString();
+                String Startlocation = Slbtn.getText().toString();
+                String EndLocation = Elbtn.getText().toString();
                 isRunning = !isRunning;
                 Check_Start.setEnabled(true);
                 if(isRunning){
@@ -387,10 +456,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                             dlg.show();
                                         }
                                     });
+                                    task = new BackTasking();
+                                    task.execute();
+                                    Toast.makeText(MapsActivity.this,
+                                            "측정을 종료합니다.", Toast.LENGTH_SHORT).show();
                                     Check_Termin.setText("측정종료");
                                     Time.setText("00:00:00");
                                     Trkind.setText("");
                                     TimeBuff = 0L;
+                                    isEstimate = false;
                                     et_TrainNo.setText(null);
                                     Check_Termin.setEnabled(false);
                                     et_TrainNo.setEnabled(true);
@@ -405,7 +479,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                     Minutes = 0;
                                     Sec = 0;
                                     Seconds = 0;
-                                    Toast.makeText(MapsActivity.this, "측정을 종료합니다.", Toast.LENGTH_SHORT).show();
+                                    showFAB();
                                 }
                             });
                     dlg.show();
@@ -419,7 +493,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         mTimerTask.cancel();
                         TimeBuff += MillisecondTime;
                         Check_Termin.setText("측정종료");
-                        Toast.makeText(MapsActivity.this, "측정을 일시정지합니다.", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MapsActivity.this,
+                                "측정을 일시정지합니다.", Toast.LENGTH_SHORT).show();
                     }
                 }
 
@@ -466,6 +541,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
 
     }
+    private void mInit(){
+        Slbtn = findViewById(R.id.slbtn);
+        Elbtn = findViewById(R.id.elbtn);
+        Setbtn = findViewById(R.id.btn3);
+        Trkind = findViewById(R.id.trkind);
+        myFAB = findViewById(R.id.floatingActionButton);
+    }
+    private void showFAB(){
+        myFAB.show();
+    }
+    private void hideFAB(){
+        myFAB.hide();
+    }
 
 
     // 뒤로가기 두번 누르면 종료 이벤트
@@ -479,7 +567,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
         else {
             backBtnTime = curTime;
-            Toast.makeText(this, "뒤로가기를 한번더 누르면 앱이 종료됩니다.",Toast.LENGTH_SHORT).show();
+            Toast.makeText(this,
+                    "뒤로가기를 한번더 누르면 앱이 종료됩니다.",Toast.LENGTH_SHORT).show();
         }
 
 
@@ -505,22 +594,20 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
         return super.dispatchTouchEvent(ev);
     }
-    //내부 DB 탐색을 위한 커서 이벤트
+    //내부DB에 저장된 열차정보 중, 출발,도착역을 탐색하기 위한 커서 메서드
     private void doWhileCursorToArray(){
         mCursor = null;
         mCursor = mDBOpenHelper.getStName(et_TrainNo.getText().toString());
 
         while (mCursor.moveToNext()){
             int index = mCursor.getColumnIndex("info_st_nm");
-//            mInfoClass = new InfoClass(
-//                    mCursor.getString(index)
-//            );
             mInfoArray_s.add(mCursor.getString(index));
             mInfoArray_e.add(mCursor.getString(index));
+            //System.out.println(mCursor.getString(index));
         }
         mCursor.close();
     }
-    //내부 DB 탐색을 통해, 열차의 종류 얻어오기
+    //내부DB에 저장된 열차정보 중, 열차종류를 탐색하기 위한 커서 메서드
     private void getStringCursor(){
         mCursor = null;
         mCursor = mDBOpenHelper.getTrKind(et_TrainNo.getText().toString());
@@ -530,7 +617,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
         mCursor.close();
     }
-    //FireBase RTDB 활성화 메소드
+    //측정용 SQLite 활성화 메소드
     @NonNull
     private TimerTask createTimertask(){
         TimerTask timerTask = new TimerTask() {
@@ -572,7 +659,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     result.put("distance_per_sec", getDistance_per_sec);
                     result.put("times", getTimes);
                     result.put("datetime", getDatetime);//초당 데이터 쓰기!!
-                    writeNewUser(Integer.toString(num), getTrainNo, getStartLocation, getEndLocation, getLatitude,
+                    writeNewUser(db, mDB, num, getTrainNo, getStartLocation, getEndLocation, getLatitude,
                             getLongitude, getAltitude, getSpeed, getTimes, getDistance_per_sec, getDatetime);
                     num++;
                 }
@@ -591,7 +678,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         result.put("distance_per_sec", getDistance_per_sec);
                         result.put("times", getTimes);
                         result.put("datetime", getDatetime);//초당 데이터 쓰기!!
-                        writeNewUser(Integer.toString(num), getTrainNo, getStartLocation, getEndLocation, getLatitude,
+                        writeNewUser(db, mDB, num, getTrainNo, getStartLocation, getEndLocation, getLatitude,
                                 getLongitude, getAltitude, getSpeed, getTimes, getDistance_per_sec, getDatetime);
                         num++;
                     }
@@ -607,38 +694,29 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
 
-    //얻어온 값들을 FBDB에 쓰기
-    private void writeNewUser (String userId, String trainNo, String startLocation, String endLocation,
+    //얻어온 값들을 SQLite에 쓰기
+    private void writeNewUser (SQLiteDatabase db, String mDB, int num, String trainNo, String startLocation, String endLocation,
                                 double latitude, double longitude, double altitude, double speed, String times, double distance_per_sec, String datetime){
-        User user = new User(trainNo, startLocation,endLocation, latitude, longitude, altitude, speed, times, distance_per_sec, datetime);
-        mDatabase.child(Trkind.getText().toString() + "-" + et_TrainNo.getText().toString() + "-" + Slbtn.getText().toString() + "-" + Elbtn.getText().toString())
-                .child(userId).setValue(user)
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
-                        // 데이터 쓰기 실패 시
-                        Toast.makeText(MapsActivity.this, "저장에 실패했습니다.", Toast.LENGTH_SHORT).show();
-                    }
-                });
-    }
-    //쓸일은 없으나, 이벤트 호환을 위해 FBDB 읽기 수행
-    private void readUser(){
-        mDatabase.child("users").child("1").addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                if(dataSnapshot.getValue(User.class) != null) {
-                    User post = dataSnapshot.getValue(User.class);
-                    Log.w("FireBaseData", "getData" + post.toString());
-                } else{
-                    Toast.makeText(MapsActivity.this, "데이터 적재 시작", Toast.LENGTH_SHORT).show();
-                }
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError databaseError) {
-                Log.w("FireBaseData", "loadPost: onCancelled", databaseError.toException());
-            }
-        });
+        String id = Integer.toString(num);
+        String lati = Double.toString(latitude);
+        String logi = Double.toString(longitude);
+        String alti = Double.toString(altitude);
+        String spd = Double.toString(speed);
+        String dps = Double.toString(distance_per_sec);
+        String INSERT_INTO =  "INSERT INTO " + mDB +
+                "(id, 열차번호, 출발역, 도착역, 위도, 경도, 고도, 속도, 경과시간, 초당이동거리, 측정시각) "
+                + "VALUES(" + id
+                + " ,'" + trainNo + "'"
+                + " ,'" + startLocation + "'"
+                + " ,'" + endLocation + "'"
+                + " ,'" + lati + "'"
+                + " ,'" + logi + "'"
+                + " ,'" + alti + "'"
+                + " ,'" + spd + "'"
+                + " ,'" + times + "'"
+                + " ,'" + dps + "'"
+                + " ,'" + datetime + "');";
+        db.execSQL(INSERT_INTO);
     }
     //스탑워치 이벤트
     public Runnable runnable = new Runnable() {
@@ -656,7 +734,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             Hour = Seconds / 3600;
 
             // TextView에 UpdateTime을 갱신해준다
-            String result = String.format("%02d",Hour) + ":" + String.format("%02d",Minutes) + ":" + String.format("%02d", Sec);
+            String result = String.format("%02d",Hour) + ":" + String.format("%02d",Minutes) +
+                    ":" + String.format("%02d", Sec);
             Time.setText(result);
 
             handler.postDelayed(this, 0);
@@ -765,7 +844,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         mMap.getUiSettings().setMyLocationButtonEnabled(true);
         // 현재 오동작을 해서 주석처리
-
         //mMap.animateCamera(CameraUpdateFactory.zoomTo(15));
         mMap.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
 
@@ -781,7 +859,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         @Override
         public void onLocationResult(LocationResult locationResult) {
             super.onLocationResult(locationResult);
-            //map collection priod
+            //map collection period
             TextView LatLong = findViewById(R.id.latlong);
             TextView Longi = findViewById(R.id.longi);
             TextView Alti = findViewById(R.id.alti);
@@ -902,17 +980,20 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     1);
         } catch (IOException ioException) {
             //네트워크 문제
-            Toast.makeText(this, "서비스 사용불가", Toast.LENGTH_LONG).show();
+            Toast.makeText(this,
+                    "서비스 사용불가", Toast.LENGTH_LONG).show();
             return "서비스 사용불가";
         } catch (IllegalArgumentException illegalArgumentException) {
-            Toast.makeText(this, "잘못된 GPS 좌표", Toast.LENGTH_LONG).show();
+            Toast.makeText(this,
+                    "잘못된 GPS 좌표", Toast.LENGTH_LONG).show();
             return "잘못된 GPS 좌표";
 
         }
 
 
         if (addresses == null || addresses.size() == 0) {
-            Toast.makeText(this, "주소 미발견", Toast.LENGTH_LONG).show();
+            Toast.makeText(this,
+                    "주소 미발견", Toast.LENGTH_LONG).show();
             return "주소 미발견";
 
         } else {
@@ -1112,6 +1193,108 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 }
 
                 break;
+        }
+    }
+    public void checkPermission2(){
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if(checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED){
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
+            }
+        }
+    }
+    // 내부 저장소에 측정한 값을 CSV 파일로 저장하기 위한 클래스
+    public class BackTasking extends AsyncTask<String, Void, Boolean> {
+        private final ProgressDialog dialog = new ProgressDialog(MapsActivity.this);
+        private Date mDate2;
+
+        // Export CSV의 진행도를 보여주는 ProgressBar
+        @Override
+        protected void onPreExecute() {
+            this.dialog.setMessage("데이터 내보내는 중...");
+            this.dialog.show();
+        }
+        // 측정한 값이 저장된 DB를 읽고 커서를 통해 CSV로 옮겨 쓴 후, 지정된 경로에 저장
+        //경로: /storage/emulated/0/export
+        protected Boolean doInBackground(final String... args) {
+            String sltext = Slbtn.getText().toString();
+            String eltext = Elbtn.getText().toString();
+            String tktext = Trkind.getText().toString();
+            String tntext = et_TrainNo.getText().toString();
+            mDate2 = new Date(mNow);
+            String date = mFormat3.format(mDate2);
+            SQLiteHelper myDBHelper = new SQLiteHelper(MapsActivity.this);
+            mDTLogHelper.dbInsert(database_name, date, tntext, tktext, sltext, eltext);
+            final String CSV = ".csv";
+            String currentDBPath = "/data/com.example.trainappol/databases/" + myDBHelper.DATABASE_NAME;
+            File dbFile = getDatabasePath(currentDBPath);
+            System.out.println(dbFile);
+            File exportDir = new File("/storage/emulated/0/export/");
+            if (!exportDir.exists()) {
+                exportDir.mkdirs();
+            }
+
+
+            File file = new File(exportDir, date + "-" + tntext + "-" + tktext + "-" + sltext + "-" + eltext + CSV);
+            try {
+                file.createNewFile();
+                // 기존엔 FileWriter 메서드를 사용하였으나, 한글이 깨지는 현상이 발생하여, BufferedWriter를 사용하여, euc-kr 로 인코딩하였음.
+                CSVWriter csvWrite = new CSVWriter(new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file), "euc-kr")));
+                db = myDBHelper.getWritableDatabase();
+                Cursor curCSV = db.rawQuery("select * from " + myDBHelper.TABLE_NAME, null);
+                csvWrite.writeNext(curCSV.getColumnNames());
+                //커서를 이용하여 DB값 하나하나 탐색한 후, CSV로 옮겨주는 작업
+                while (curCSV.moveToNext()) {
+                    String arrStr[] = null;
+                    String[] mySecondStringArray = new String[curCSV.getColumnNames().length];
+                    for (int i = 0; i < curCSV.getColumnNames().length; i++) {
+                       mySecondStringArray[i] = curCSV.getString(i);
+                       //System.out.println(curCSV.getString(i));
+                    }
+                    csvWrite.writeNext(mySecondStringArray);
+                }
+                csvWrite.close();
+                curCSV.close();
+                dbFile.delete();
+                return true;
+            } catch (IOException e) {
+                Log.e("MapsActivity", e.getMessage(), e);
+                return false;
+            }
+        }
+        //doInBackground 함수 리턴값이 true라면 저장 성공, false라면 저장 실패.
+        protected void onPostExecute(final Boolean success) {
+            if (this.dialog.isShowing()) {
+                this.dialog.dismiss();
+            }
+            if (success) {
+                //Toast.makeText(MapsActivity.this, "데이터 저장에 성공하였습니다.", Toast.LENGTH_SHORT).show();
+                Snackbar.make(mLayout,"내부폴더(export)에 데이터 저장을 성공하였습니다.",
+                        Snackbar.LENGTH_INDEFINITE).setAction("확인", new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                    }
+                }).show();
+            } else {
+                //Toast.makeText(MapsActivity.this, "데이터 저장에 실패하였습니다.", Toast.LENGTH_SHORT).show();
+                Snackbar.make(mLayout,"데이터 저장에 실패하였습니다. \n내부폴더 용량 및 네트워크를 확인한 후, 데이터로그 페이지에서 다시 다운로드를 시도해주세요.",
+                        Snackbar.LENGTH_INDEFINITE).setAction("확인", new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                    }
+                }).show();
+            }
+        }
+    }
+
+
+
+    public void askForPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                startActivity(intent);
+                return;
+            }
         }
     }
 
