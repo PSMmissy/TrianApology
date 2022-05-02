@@ -160,6 +160,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     //SQLite 변수들
     private DBOpenHelper mDBOpenHelper;
+    private DTlogHelper mDTLogHelper;
     private Cursor mCursor;
     private InfoClass mInfoClass;
 //    private ArrayList<InfoClass> mInfoArray;
@@ -171,7 +172,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
 
     private SQLiteDatabase db;
-
+    private DTlogHelper logDB;
 
     // 프로그래스바
     private ProgressBar progressBar;
@@ -187,8 +188,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         task = new BackTasking();
         imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
         mDBOpenHelper = new DBOpenHelper(this);
+        mDTLogHelper = new DTlogHelper(this);
         mDBOpenHelper.open();
+        mDTLogHelper.open();
         mInit();
+        myFAB.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent intent = new Intent(getApplicationContext(),SubActivity.class);
+                startActivity(intent);
+            }
+        });
         mInfoArray_s = new ArrayList<String>();
         mInfoArray_e = new ArrayList<String>();
         trkind = "";
@@ -352,7 +362,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                 hideFAB();
                                 SQLiteHelper.DATABASE_NAME = mFormat2.format(System.currentTimeMillis()) + ".db";
                                 SQLiteHelper myDBHelper = new SQLiteHelper(MapsActivity.this);
-                                database_name = SQLiteHelper.DATABASE_NAME;
+                                database_name = SQLiteHelper.DATABASE_NAME.replace(".db","");
                                 mDB = SQLiteHelper.TABLE_NAME;
                                 Check_Termin.setText("일시정지");
                                 isRunning = !isRunning;
@@ -401,6 +411,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         Check_Termin.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                String Date = mFormat3.format(System.currentTimeMillis());
+                String TrainNum = et_TrainNo.getText().toString();
+                String TrainKid = Trkind.getText().toString();
+                String Startlocation = Slbtn.getText().toString();
+                String EndLocation = Elbtn.getText().toString();
                 isRunning = !isRunning;
                 Check_Start.setEnabled(true);
                 if(isRunning){
@@ -588,6 +603,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             int index = mCursor.getColumnIndex("info_st_nm");
             mInfoArray_s.add(mCursor.getString(index));
             mInfoArray_e.add(mCursor.getString(index));
+            //System.out.println(mCursor.getString(index));
         }
         mCursor.close();
     }
@@ -1206,8 +1222,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             String tntext = et_TrainNo.getText().toString();
             mDate2 = new Date(mNow);
             String date = mFormat3.format(mDate2);
-            final String CSV = ".csv";
             SQLiteHelper myDBHelper = new SQLiteHelper(MapsActivity.this);
+            mDTLogHelper.dbInsert(database_name, date, tntext, tktext, sltext, eltext);
+            final String CSV = ".csv";
             String currentDBPath = "/data/com.example.trainappol/databases/" + myDBHelper.DATABASE_NAME;
             File dbFile = getDatabasePath(currentDBPath);
             System.out.println(dbFile);
@@ -1215,6 +1232,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             if (!exportDir.exists()) {
                 exportDir.mkdirs();
             }
+
 
             File file = new File(exportDir, date + "-" + tntext + "-" + tktext + "-" + sltext + "-" + eltext + CSV);
             try {
@@ -1230,6 +1248,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     String[] mySecondStringArray = new String[curCSV.getColumnNames().length];
                     for (int i = 0; i < curCSV.getColumnNames().length; i++) {
                        mySecondStringArray[i] = curCSV.getString(i);
+                       //System.out.println(curCSV.getString(i));
                     }
                     csvWrite.writeNext(mySecondStringArray);
                 }
@@ -1257,7 +1276,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 }).show();
             } else {
                 //Toast.makeText(MapsActivity.this, "데이터 저장에 실패하였습니다.", Toast.LENGTH_SHORT).show();
-                Snackbar.make(mLayout,"데이터 저장에 실패하였습니다. \n내부폴더 용량 및 네트워크를 확인하세요.",
+                Snackbar.make(mLayout,"데이터 저장에 실패하였습니다. \n내부폴더 용량 및 네트워크를 확인한 후, 데이터로그 페이지에서 다시 다운로드를 시도해주세요.",
                         Snackbar.LENGTH_INDEFINITE).setAction("확인", new View.OnClickListener() {
                     @Override
                     public void onClick(View view) {
