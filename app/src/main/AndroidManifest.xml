@@ -43,7 +43,7 @@
         -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="@string/google_maps_key" />
+            android:value="AIzaSyBFhoSAnKrNBrziy8wg8FoU-iyv0_8TVp0" />
 
         <activity android:name=".IntroActivity"
             android:theme="@style/Theme.AppCompat.NoActionBar"
